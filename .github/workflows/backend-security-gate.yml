@@ -1,0 +1,58 @@
+# Reusable workflow — lives in .github/workflows/ of this repo.
+# Called by consumer projects via backend-security-gate-caller.yml.
+# Do NOT copy this into consumer projects.
+
+name: Backend Security Gate
+
+on:
+  workflow_call:
+    secrets:
+      NPM_TOKEN:
+        required: true
+
+jobs:
+  backend-security-checks:
+    name: Backend Security Checks
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Authenticate with GitHub Packages
+        run: |
+          echo "@achudeqxbit:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run backend audit
+        run: npm run backend:audit
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run npm audit
+        run: npm run npm-audit
+
+      - name: Safe to merge
+        if: success()
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════"
+          echo "✅ SAFE TO MERGE"
+          echo "Backend security gate cleared successfully."
+          echo "═══════════════════════════════════════"

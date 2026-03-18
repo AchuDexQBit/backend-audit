@@ -1,0 +1,32 @@
+{
+  "name": "@achudeqxbit/backend-audit",
+  "version": "1.0.0",
+  "description": "Shared backend structure and security audit tool for Node.js/Express projects",
+  "type": "module",
+  "main": "src/backend-audit.mjs",
+  "bin": {
+    "backend-audit": "./bin/run.mjs",
+    "backend-audit-init": "./bin/init.mjs"
+  },
+  "files": [
+    "src/",
+    "bin/",
+    "workflows/"
+  ],
+  "scripts": {
+    "prepublishOnly": "echo 'Publishing @achudeqxbit/backend-audit'"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AchuDexQBit/backend-audit.git"
+  },
+  "keywords": ["security", "audit", "nodejs", "express", "static-analysis"],
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  }
+}

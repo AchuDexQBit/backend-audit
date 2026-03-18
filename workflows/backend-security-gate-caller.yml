@@ -1,0 +1,22 @@
+# This file is copied into consumer projects by `npx backend-audit-init`.
+# It calls the reusable workflow from the backend-audit repo.
+# You never need to edit this file — all logic lives in the package repo.
+
+name: Backend Security Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - dev
+      - stage
+      - prod
+
+jobs:
+  backend-security-checks:
+    uses: AchuDexQBit/backend-audit/.github/workflows/backend-security-gate.yml@master
+    permissions:
+      contents: read
+      pull-requests: read
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

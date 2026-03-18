@@ -43,11 +43,7 @@ const CONFIG = {
 
   // Required files inside each module
   moduleRequiredFiles: ["index.js"],
-  moduleRequiredSuffixes: [
-    "_controllers.js",
-    "_services.js",
-    "_routes.js",
-  ],
+  moduleRequiredSuffixes: ["_controllers.js", "_services.js", "_routes.js"],
   moduleRequiredDirs: ["_endpoints"],
 
   // Public routes that don't need auth (relative to appRoutesDir)
@@ -82,9 +78,18 @@ const SECURITY_PATTERNS = {
     { pattern: /password\s*[:=]\s*['"][^'"]+['"]/gi, name: "Password" },
     { pattern: /secret\s*[:=]\s*['"][^'"]{10,}['"]/gi, name: "Secret" },
     { pattern: /token\s*[:=]\s*['"][^'"]{20,}['"]/gi, name: "Token" },
-    { pattern: /private[_-]?key\s*[:=]\s*['"][^'"]+['"]/gi, name: "Private Key" },
-    { pattern: /mongodb(\+srv)?:\/\/[^:]+:[^@]+@/gi, name: "MongoDB Connection String" },
-    { pattern: /postgres:\/\/[^:]+:[^@]+@/gi, name: "PostgreSQL Connection String" },
+    {
+      pattern: /private[_-]?key\s*[:=]\s*['"][^'"]+['"]/gi,
+      name: "Private Key",
+    },
+    {
+      pattern: /mongodb(\+srv)?:\/\/[^:]+:[^@]+@/gi,
+      name: "MongoDB Connection String",
+    },
+    {
+      pattern: /postgres:\/\/[^:]+:[^@]+@/gi,
+      name: "PostgreSQL Connection String",
+    },
     { pattern: /mysql:\/\/[^:]+:[^@]+@/gi, name: "MySQL Connection String" },
     { pattern: /Bearer\s+[A-Za-z0-9\-._~+\/]+=*/gi, name: "Bearer Token" },
     { pattern: /sk-[a-zA-Z0-9]{32,}/gi, name: "OpenAI API Key" },
@@ -92,12 +97,14 @@ const SECURITY_PATTERNS = {
   sqlInjection: [
     {
       // Raw string concatenation in db.execute / db.query / pool.query
-      pattern: /(?:db|pool|connection|conn)\s*\.\s*(?:execute|query)\s*\(\s*['"`][^'"`]*\+/gi,
+      pattern:
+        /(?:db|pool|connection|conn)\s*\.\s*(?:execute|query)\s*\(\s*['"`][^'"`]*\+/gi,
       name: "SQL String Concatenation in db call",
     },
     {
       // Template literals in db calls
-      pattern: /(?:db|pool|connection|conn)\s*\.\s*(?:execute|query)\s*\(\s*`[^`]*\$\{/gi,
+      pattern:
+        /(?:db|pool|connection|conn)\s*\.\s*(?:execute|query)\s*\(\s*`[^`]*\$\{/gi,
       name: "Template Literal in SQL query",
     },
     {
@@ -124,15 +131,18 @@ const SECURITY_PATTERNS = {
     {
       // endpoint file exports an async function but has no validation
       // We check for absence of common validation patterns
-      missingPattern: /(?:joi|zod|yup|express-validator|validator|req\.body\s*&&|if\s*\(\s*!req\.body|validateBody|validate\()/gi,
+      missingPattern:
+        /(?:joi|zod|yup|express-validator|validator|req\.body\s*&&|if\s*\(\s*!req\.body|validateBody|validate\()/gi,
       name: "Missing Input Validation",
     },
   ],
   transactions: [
     {
       // db.execute used in a write context but no beginTransaction / START TRANSACTION
-      writePattern: /(?:INSERT|UPDATE|DELETE|insert|update|delete)\s+(?:INTO|FROM|)\s*\w+/g,
-      transactionPattern: /(?:beginTransaction|START TRANSACTION|db\.beginTransaction|connection\.beginTransaction|await\s+\w+\.beginTransaction)/gi,
+      writePattern:
+        /(?:INSERT|UPDATE|DELETE|insert|update|delete)\s+(?:INTO|FROM|)\s*\w+/g,
+      transactionPattern:
+        /(?:beginTransaction|START TRANSACTION|db\.beginTransaction|connection\.beginTransaction|await\s+\w+\.beginTransaction)/gi,
       name: "Missing Transaction on Write Operation",
     },
   ],
@@ -140,7 +150,15 @@ const SECURITY_PATTERNS = {
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
-function addFinding(severity, category, file, line, issue, recommendation, code = "") {
+function addFinding(
+  severity,
+  category,
+  file,
+  line,
+  issue,
+  recommendation,
+  code = "",
+) {
   results[severity].push({
     category,
     file: path.relative(CONFIG.projectRoot, String(file)),
@@ -430,7 +448,8 @@ function checkHardcodedSecrets(file, content) {
           line.includes("example") ||
           line.includes("your-") ||
           line.includes("process.env")
-        ) return;
+        )
+          return;
         addFinding(
           "critical",
           "Hardcoded Secrets",
@@ -471,15 +490,26 @@ function checkInsecurePatterns(file, content) {
     const regex = new RegExp(pattern.source, pattern.flags.replace("g", ""));
     lines.forEach((line, index) => {
       if (regex.test(line)) {
-        const severity = name.includes("console") || name.includes("Debugger") ? "low" : "medium";
+        const severity =
+          name.includes("console") || name.includes("Debugger")
+            ? "low"
+            : "medium";
         const recommendation = name.includes("console.log")
           ? "Remove console.log in production. Use a proper logger (e.g. Winston) with log levels."
           : name.includes("console.error")
-          ? "Replace console.error with a proper logger. Avoid leaking stack traces in production."
-          : name.includes("Debugger")
-          ? "Remove debugger statements before committing."
-          : "Never store sensitive data in browser storage.";
-        addFinding(severity, "Insecure Pattern", file, index + 1, name, recommendation, line);
+            ? "Replace console.error with a proper logger. Avoid leaking stack traces in production."
+            : name.includes("Debugger")
+              ? "Remove debugger statements before committing."
+              : "Never store sensitive data in browser storage.";
+        addFinding(
+          severity,
+          "Insecure Pattern",
+          file,
+          index + 1,
+          name,
+          recommendation,
+          line,
+        );
       }
     });
   });
@@ -490,7 +520,8 @@ function checkInputValidation(file, content) {
   if (!file.includes("_endpoints")) return;
 
   const lines = content.split("\n");
-  const hasValidation = SECURITY_PATTERNS.inputValidation[0].missingPattern.test(content);
+  const hasValidation =
+    SECURITY_PATTERNS.inputValidation[0].missingPattern.test(content);
   const hasReqBody = /req\.body/gi.test(content);
   const hasReqParams = /req\.params/gi.test(content);
   const hasReqQuery = /req\.query/gi.test(content);
@@ -530,7 +561,11 @@ function checkTransactions(file, content) {
 }
 
 function checkAuthMiddleware() {
-  const appIndexPath = path.join(CONFIG.projectRoot, CONFIG.appRoutesDir, "index.js");
+  const appIndexPath = path.join(
+    CONFIG.projectRoot,
+    CONFIG.appRoutesDir,
+    "index.js",
+  );
   if (!fs.existsSync(appIndexPath)) return;
 
   const content = readFile(appIndexPath);
@@ -681,9 +716,14 @@ function generateReport() {
       ${generateSeveritySection("high", "High Severity Issues")}
       ${generateSeveritySection("medium", "Medium Severity Issues")}
       ${generateSeveritySection("low", "Low Severity Issues")}
-      ${results.critical.length === 0 && results.high.length === 0 && results.medium.length === 0 && results.low.length === 0
-        ? '<div style="text-align:center;padding:60px;color:#28a745;font-size:1.3em;font-weight:600;">✅ No issues found — looking good!</div>'
-        : ""}
+      ${
+        results.critical.length === 0 &&
+        results.high.length === 0 &&
+        results.medium.length === 0 &&
+        results.low.length === 0
+          ? '<div style="text-align:center;padding:60px;color:#28a745;font-size:1.3em;font-weight:600;">✅ No issues found — looking good!</div>'
+          : ""
+      }
     </div>
     <div class="footer">
       <div class="stats">
@@ -766,4 +806,4 @@ function runAudit() {
   console.log("✅ All checks passed.");
 }
 
-runAudit();
+export { runAudit };

@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 18
           registry-url: "https://npm.pkg.github.com"
-          scope: "@achudeqxbit"
+          scope: "@AchuDexQBit"
 
       - name: Publish
         run: npm publish --access public

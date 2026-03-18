@@ -38,14 +38,14 @@ console.log("Copied files");
 const npmrcPath = path.resolve(process.cwd(), ".npmrc");
 if (!fs.existsSync(npmrcPath)) {
   console.log("\nNo .npmrc found. Create one in the project root with:");
-  console.log("   @achudeqxbit:registry=https://npm.pkg.github.com");
+  console.log("   @AchuDexQBit:registry=https://npm.pkg.github.com");
   console.log("   //npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n");
 } else {
   const npmrc = fs.readFileSync(npmrcPath, "utf8");
   if (!npmrc.includes("npm.pkg.github.com")) {
     console.log("\nYour .npmrc may not be configured for GitHub Packages.");
     console.log("   Add these lines to .npmrc:");
-    console.log("   @achudeqxbit:registry=https://npm.pkg.github.com");
+    console.log("   @AchuDexQBit:registry=https://npm.pkg.github.com");
     console.log("   //npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n");
   }
 }
@@ -53,7 +53,7 @@ if (!fs.existsSync(npmrcPath)) {
 // 5. Remind about package.json scripts
 console.log("\nAdd these scripts to your project's package.json:");
 console.log(
-  `   "backend:audit": "node node_modules/@achudeqxbit/backend-audit/bin/run.mjs",`,
+  `   "backend:audit": "node node_modules/@AchuDexQBit/backend-audit/bin/run.mjs",`,
 );
 console.log(`   "npm-audit":     "npm audit --audit-level=moderate"\n`);
 

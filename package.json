@@ -1,5 +1,5 @@
 {
-  "name": "@achudeqxbit/backend-audit",
+  "name": "@AchuDexQBit/backend-audit",
   "version": "1.1.0",
   "description": "Shared backend structure and security audit tool for Node.js/Express projects",
   "type": "module",
@@ -14,7 +14,7 @@
     "workflows/"
   ],
   "scripts": {
-    "prepublishOnly": "echo 'Publishing @achudeqxbit/backend-audit'"
+    "prepublishOnly": "echo 'Publishing @AchuDexQBit/backend-audit'"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",

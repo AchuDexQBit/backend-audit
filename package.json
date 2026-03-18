@@ -1,6 +1,6 @@
 {
   "name": "@AchuDexQBit/backend-audit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Shared backend structure and security audit tool for Node.js/Express projects",
   "type": "module",
   "main": "src/backend-audit.mjs",

@@ -70,83 +70,138 @@ const results = {
   },
 };
 
-// ─── Security Patterns ────────────────────────────────────────────────────────
+// ─── Security Pattern Definitions ─────────────────────────────────────────────
+//
+// IMPORTANT: All patterns are stored as { source, flags } objects rather than
+// regex literals. A fresh RegExp is constructed each time it is used via
+// makeRegex(). This prevents the well-known JavaScript /g flag statefulness
+// bug where a regex object retains lastIndex between .test() / .exec() calls
+// across different strings, causing false-negative matches.
 
 const SECURITY_PATTERNS = {
   hardcodedSecrets: [
-    { pattern: /api[_-]?key\s*[:=]\s*['"][^'"]{10,}['"]/gi, name: "API Key" },
-    { pattern: /password\s*[:=]\s*['"][^'"]+['"]/gi, name: "Password" },
-    { pattern: /secret\s*[:=]\s*['"][^'"]{10,}['"]/gi, name: "Secret" },
-    { pattern: /token\s*[:=]\s*['"][^'"]{20,}['"]/gi, name: "Token" },
     {
-      pattern: /private[_-]?key\s*[:=]\s*['"][^'"]+['"]/gi,
+      source: "api[_-]?key\\s*[:=]\\s*['\"][^'\"]{10,}['\"]",
+      flags: "gi",
+      name: "API Key",
+    },
+    {
+      source: "password\\s*[:=]\\s*['\"][^'\"]+['\"]",
+      flags: "gi",
+      name: "Password",
+    },
+    {
+      source: "secret\\s*[:=]\\s*['\"][^'\"]{10,}['\"]",
+      flags: "gi",
+      name: "Secret",
+    },
+    {
+      source: "token\\s*[:=]\\s*['\"][^'\"]{20,}['\"]",
+      flags: "gi",
+      name: "Token",
+    },
+    {
+      source: "private[_-]?key\\s*[:=]\\s*['\"][^'\"]+['\"]",
+      flags: "gi",
       name: "Private Key",
     },
     {
-      pattern: /mongodb(\+srv)?:\/\/[^:]+:[^@]+@/gi,
+      source: "mongodb(\\+srv)?:\\/\\/[^:]+:[^@]+@",
+      flags: "gi",
       name: "MongoDB Connection String",
     },
     {
-      pattern: /postgres:\/\/[^:]+:[^@]+@/gi,
+      source: "postgres:\\/\\/[^:]+:[^@]+@",
+      flags: "gi",
       name: "PostgreSQL Connection String",
     },
-    { pattern: /mysql:\/\/[^:]+:[^@]+@/gi, name: "MySQL Connection String" },
-    { pattern: /Bearer\s+[A-Za-z0-9\-._~+\/]+=*/gi, name: "Bearer Token" },
-    { pattern: /sk-[a-zA-Z0-9]{32,}/gi, name: "OpenAI API Key" },
+    {
+      source: "mysql:\\/\\/[^:]+:[^@]+@",
+      flags: "gi",
+      name: "MySQL Connection String",
+    },
+    {
+      source: "Bearer\\s+[A-Za-z0-9\\-._~+\\/]+=*",
+      flags: "gi",
+      name: "Bearer Token",
+    },
+    { source: "sk-[a-zA-Z0-9]{32,}", flags: "gi", name: "OpenAI API Key" },
   ],
   sqlInjection: [
     {
-      // Raw string concatenation in db.execute / db.query / pool.query
-      pattern:
-        /(?:db|pool|connection|conn)\s*\.\s*(?:execute|query)\s*\(\s*['"`][^'"`]*\+/gi,
+      source:
+        "(?:db|pool|connection|conn)\\s*\\.\\s*(?:execute|query)\\s*\\(\\s*['\"`][^'\"`]*\\+",
+      flags: "gi",
       name: "SQL String Concatenation in db call",
     },
     {
-      // Template literals in db calls
-      pattern:
-        /(?:db|pool|connection|conn)\s*\.\s*(?:execute|query)\s*\(\s*`[^`]*\$\{/gi,
+      source:
+        "(?:db|pool|connection|conn)\\s*\\.\\s*(?:execute|query)\\s*\\(\\s*`[^`]*\\$\\{",
+      flags: "gi",
       name: "Template Literal in SQL query",
     },
     {
-      // Raw string concat building a query variable then used
-      pattern: /(?:query|sql)\s*[+]=\s*['"`]/gi,
+      source: "(?:query|sql)\\s*[+]=\\s*['\"`]",
+      flags: "gi",
       name: "SQL String Being Built via Concatenation",
     },
     {
-      // execSync with interpolation
-      pattern: /execSync\s*\(\s*['"`][^'"`]*\$\{/gi,
+      source: "execSync\\s*\\(\\s*['\"`][^'\"`]*\\$\\{",
+      flags: "gi",
       name: "Command Injection Risk",
     },
   ],
   insecurePatterns: [
-    { pattern: /console\.log\s*\(/gi, name: "console.log Statement" },
-    { pattern: /console\.error\s*\(/gi, name: "console.error Statement" },
-    { pattern: /debugger\s*;?/gi, name: "Debugger Statement" },
     {
-      pattern: /localStorage\.setItem.*(?:token|password|secret)/gi,
+      source: "console\\.log\\s*\\(",
+      flags: "gi",
+      name: "console.log Statement",
+    },
+    {
+      source: "console\\.error\\s*\\(",
+      flags: "gi",
+      name: "console.error Statement",
+    },
+    { source: "debugger\\s*;?", flags: "gi", name: "Debugger Statement" },
+    {
+      source: "localStorage\\.setItem.*(?:token|password|secret)",
+      flags: "gi",
       name: "Sensitive Data in LocalStorage",
     },
   ],
-  inputValidation: [
-    {
-      // endpoint file exports an async function but has no validation
-      // We check for absence of common validation patterns
-      missingPattern:
-        /(?:joi|zod|yup|express-validator|validator|req\.body\s*&&|if\s*\(\s*!req\.body|validateBody|validate\()/gi,
-      name: "Missing Input Validation",
+  inputValidation: {
+    // Presence of any recognised validation library or guard
+    validationPresence: {
+      source:
+        "(?:joi|zod|yup|express-validator|validator|req\\.body\\s*&&|if\\s*\\(\\s*!req\\.body|validateBody|validate\\()",
+      flags: "gi",
     },
-  ],
-  transactions: [
-    {
-      // db.execute used in a write context but no beginTransaction / START TRANSACTION
-      writePattern:
-        /(?:INSERT|UPDATE|DELETE|insert|update|delete)\s+(?:INTO|FROM|)\s*\w+/g,
-      transactionPattern:
-        /(?:beginTransaction|START TRANSACTION|db\.beginTransaction|connection\.beginTransaction|await\s+\w+\.beginTransaction)/gi,
-      name: "Missing Transaction on Write Operation",
+    reqDataUsage: {
+      body: { source: "req\\.body", flags: "gi" },
+      params: { source: "req\\.params", flags: "gi" },
+      query: { source: "req\\.query", flags: "gi" },
     },
-  ],
+  },
+  transactions: {
+    // Matches any write SQL keyword at the start of a statement
+    writePattern: {
+      source:
+        "(?:INSERT|UPDATE|DELETE|insert|update|delete)\\s+(?:INTO|FROM|)\\s*\\w+",
+      flags: "g",
+    },
+    // Matches any recognised transaction-begin call
+    transactionPattern: {
+      source:
+        "(?:beginTransaction|START TRANSACTION|db\\.beginTransaction|connection\\.beginTransaction|await\\s+\\w+\\.beginTransaction)",
+      flags: "gi",
+    },
+  },
 };
+
+/** Build a fresh RegExp from a pattern definition — never reuse a /g instance. */
+function makeRegex({ source, flags }) {
+  return new RegExp(source, flags);
+}
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
@@ -253,7 +308,6 @@ function checkMiddleware() {
     return;
   }
 
-  // Check required middleware directories exist
   CONFIG.requiredMiddleware.forEach((mw) => {
     const mwPath = path.join(middlewareDir, mw);
     if (!fs.existsSync(mwPath)) {
@@ -289,7 +343,6 @@ function checkMiddleware() {
     }
   });
 
-  // Check middleware index.js registers all middleware
   const middlewareIndexPath = path.join(middlewareDir, "index.js");
   if (fs.existsSync(middlewareIndexPath)) {
     const content = readFile(middlewareIndexPath);
@@ -334,7 +387,6 @@ function checkModuleStructure() {
     return;
   }
 
-  // Check app/index.js exists
   const appIndexPath = path.join(appDir, "index.js");
   if (!fs.existsSync(appIndexPath)) {
     addFinding(
@@ -347,7 +399,6 @@ function checkModuleStructure() {
     );
   }
 
-  // Get all module directories
   const entries = fs.readdirSync(appDir);
   const modules = entries.filter((entry) => {
     const entryPath = path.join(appDir, entry);
@@ -363,7 +414,6 @@ function checkModuleStructure() {
 }
 
 function checkSingleModule(moduleName, moduleDir, appIndexPath) {
-  // Check index.js
   const indexPath = path.join(moduleDir, "index.js");
   if (!fs.existsSync(indexPath)) {
     addFinding(
@@ -376,7 +426,6 @@ function checkSingleModule(moduleName, moduleDir, appIndexPath) {
     );
   }
 
-  // Check required suffixed files (_controllers.js, _services.js, _routes.js)
   CONFIG.moduleRequiredSuffixes.forEach((suffix) => {
     const expectedFile = `${moduleName}${suffix}`;
     const filePath = path.join(moduleDir, expectedFile);
@@ -392,7 +441,6 @@ function checkSingleModule(moduleName, moduleDir, appIndexPath) {
     }
   });
 
-  // Check _endpoints directory
   const endpointsDir = path.join(moduleDir, `${moduleName}_endpoints`);
   if (!fs.existsSync(endpointsDir)) {
     addFinding(
@@ -404,7 +452,6 @@ function checkSingleModule(moduleName, moduleDir, appIndexPath) {
       `Create the endpoints directory at ${path.relative(CONFIG.projectRoot, endpointsDir)}`,
     );
   } else {
-    // Check endpoints/index.js
     const endpointsIndex = path.join(endpointsDir, "index.js");
     if (!fs.existsSync(endpointsIndex)) {
       addFinding(
@@ -418,7 +465,6 @@ function checkSingleModule(moduleName, moduleDir, appIndexPath) {
     }
   }
 
-  // Check module is registered in app/index.js
   if (appIndexPath && fs.existsSync(appIndexPath)) {
     const appIndexContent = readFile(appIndexPath);
     if (appIndexContent && !appIndexContent.includes(moduleName)) {
@@ -438,8 +484,12 @@ function checkSingleModule(moduleName, moduleDir, appIndexPath) {
 
 function checkHardcodedSecrets(file, content) {
   const lines = content.split("\n");
-  SECURITY_PATTERNS.hardcodedSecrets.forEach(({ pattern, name }) => {
-    const regex = new RegExp(pattern.source, pattern.flags.replace("g", ""));
+  SECURITY_PATTERNS.hardcodedSecrets.forEach((patternDef) => {
+    // Build a fresh non-global regex for per-line testing
+    const regex = makeRegex({
+      source: patternDef.source,
+      flags: patternDef.flags.replace("g", ""),
+    });
     lines.forEach((line, index) => {
       if (regex.test(line)) {
         if (
@@ -455,7 +505,7 @@ function checkHardcodedSecrets(file, content) {
           "Hardcoded Secrets",
           file,
           index + 1,
-          `Potential ${name} hardcoded in source code`,
+          `Potential ${patternDef.name} hardcoded in source code`,
           `Move this to environment variables and access via process.env. Never commit secrets to version control.`,
           line,
         );
@@ -466,8 +516,12 @@ function checkHardcodedSecrets(file, content) {
 
 function checkSqlInjection(file, content) {
   const lines = content.split("\n");
-  SECURITY_PATTERNS.sqlInjection.forEach(({ pattern, name }) => {
-    const regex = new RegExp(pattern.source, pattern.flags.replace("g", ""));
+  SECURITY_PATTERNS.sqlInjection.forEach((patternDef) => {
+    // Build a fresh non-global regex for per-line testing
+    const regex = makeRegex({
+      source: patternDef.source,
+      flags: patternDef.flags.replace("g", ""),
+    });
     lines.forEach((line, index) => {
       if (regex.test(line)) {
         addFinding(
@@ -475,7 +529,7 @@ function checkSqlInjection(file, content) {
           "SQL Injection",
           file,
           index + 1,
-          `Potential SQL Injection: ${name}`,
+          `Potential SQL Injection: ${patternDef.name}`,
           `Use parameterized queries. Example: db.execute('SELECT * FROM table WHERE id = ?', [id]) — never concatenate user input into SQL strings.`,
           line,
         );
@@ -486,19 +540,24 @@ function checkSqlInjection(file, content) {
 
 function checkInsecurePatterns(file, content) {
   const lines = content.split("\n");
-  SECURITY_PATTERNS.insecurePatterns.forEach(({ pattern, name }) => {
-    const regex = new RegExp(pattern.source, pattern.flags.replace("g", ""));
+  SECURITY_PATTERNS.insecurePatterns.forEach((patternDef) => {
+    // Build a fresh non-global regex for per-line testing
+    const regex = makeRegex({
+      source: patternDef.source,
+      flags: patternDef.flags.replace("g", ""),
+    });
     lines.forEach((line, index) => {
       if (regex.test(line)) {
         const severity =
-          name.includes("console") || name.includes("Debugger")
+          patternDef.name.includes("console") ||
+          patternDef.name.includes("Debugger")
             ? "low"
             : "medium";
-        const recommendation = name.includes("console.log")
+        const recommendation = patternDef.name.includes("console.log")
           ? "Remove console.log in production. Use a proper logger (e.g. Winston) with log levels."
-          : name.includes("console.error")
+          : patternDef.name.includes("console.error")
             ? "Replace console.error with a proper logger. Avoid leaking stack traces in production."
-            : name.includes("Debugger")
+            : patternDef.name.includes("Debugger")
               ? "Remove debugger statements before committing."
               : "Never store sensitive data in browser storage.";
         addFinding(
@@ -506,7 +565,7 @@ function checkInsecurePatterns(file, content) {
           "Insecure Pattern",
           file,
           index + 1,
-          name,
+          patternDef.name,
           recommendation,
           line,
         );
@@ -516,17 +575,22 @@ function checkInsecurePatterns(file, content) {
 }
 
 function checkInputValidation(file, content) {
-  // Only check endpoint files
   if (!file.includes("_endpoints")) return;
 
-  const lines = content.split("\n");
-  const hasValidation =
-    SECURITY_PATTERNS.inputValidation[0].missingPattern.test(content);
-  const hasReqBody = /req\.body/gi.test(content);
-  const hasReqParams = /req\.params/gi.test(content);
-  const hasReqQuery = /req\.query/gi.test(content);
+  // Each test gets a fresh regex — no shared state
+  const hasValidation = makeRegex(
+    SECURITY_PATTERNS.inputValidation.validationPresence,
+  ).test(content);
+  const hasReqBody = makeRegex(
+    SECURITY_PATTERNS.inputValidation.reqDataUsage.body,
+  ).test(content);
+  const hasReqParams = makeRegex(
+    SECURITY_PATTERNS.inputValidation.reqDataUsage.params,
+  ).test(content);
+  const hasReqQuery = makeRegex(
+    SECURITY_PATTERNS.inputValidation.reqDataUsage.query,
+  ).test(content);
 
-  // Only flag if it uses req.body/params/query but has no validation
   if ((hasReqBody || hasReqParams || hasReqQuery) && !hasValidation) {
     addFinding(
       "medium",
@@ -540,13 +604,15 @@ function checkInputValidation(file, content) {
 }
 
 function checkTransactions(file, content) {
-  // Only check endpoint files
   if (!file.includes("_endpoints")) return;
 
-  const isWriteEndpoint =
-    SECURITY_PATTERNS.transactions[0].writePattern.test(content);
-  const hasTransaction =
-    SECURITY_PATTERNS.transactions[0].transactionPattern.test(content);
+  // Build fresh RegExp instances for every file — eliminates lastIndex statefulness
+  const isWriteEndpoint = makeRegex(
+    SECURITY_PATTERNS.transactions.writePattern,
+  ).test(content);
+  const hasTransaction = makeRegex(
+    SECURITY_PATTERNS.transactions.transactionPattern,
+  ).test(content);
 
   if (isWriteEndpoint && !hasTransaction) {
     addFinding(
@@ -573,7 +639,6 @@ function checkAuthMiddleware() {
 
   const lines = content.split("\n");
 
-  // Check tokenValidator is used
   const hasTokenValidator = /tokenValidat/gi.test(content);
   if (!hasTokenValidator) {
     addFinding(
@@ -587,13 +652,11 @@ function checkAuthMiddleware() {
     return;
   }
 
-  // Find the line where tokenValidator is applied
   let tokenValidatorLine = -1;
   lines.forEach((line, index) => {
     if (/tokenValidat/gi.test(line)) tokenValidatorLine = index;
   });
 
-  // Check if any module is registered BEFORE tokenValidator (other than public ones)
   if (tokenValidatorLine > -1) {
     lines.forEach((line, index) => {
       if (index >= tokenValidatorLine) return;
@@ -744,7 +807,6 @@ function runAudit() {
   console.log("\nStarting backend audit...\n");
   const startTime = Date.now();
 
-  // ── Structure checks
   console.log("Checking utils files...");
   checkUtilsFiles();
 
@@ -757,7 +819,6 @@ function runAudit() {
   console.log("Checking auth middleware...");
   checkAuthMiddleware();
 
-  // ── Code safety checks
   console.log("Scanning source files...");
   const files = getAllFiles(path.join(CONFIG.projectRoot, "src"));
   results.summary.filesScanned = files.length;
@@ -774,7 +835,6 @@ function runAudit() {
     checkTransactions(file, content);
   });
 
-  // ── Report
   console.log("Generating report...");
   const html = generateReport();
   const outputPath = path.join(CONFIG.projectRoot, CONFIG.outputFile);
